@@ -54,7 +54,7 @@
 
 
   <div v-if="loading" id="loading">
-    <div>Loading projects...</div>
+    <div>{{ loading === true ? 'Loading projects...' : 'Refreshing ' + loading }}</div>
   </div>
 
 
@@ -217,7 +217,7 @@
 
               <img src="/refresh.svg" :class="`${ loading === project.title ? 'spin' : '' }`" style="width: 20px; margin-right: 5px; margin-left: 10px;" @click="refreshJira(project)" alt="">
 
-              <img src="/todo.svg" @click="generateClipboard(project)" style="width: 20px; margin-right: 5px; margin-left: 10px;" alt="">
+              <!-- <img src="/todo.svg" @click="generateClipboard(project)" style="width: 20px; margin-right: 5px; margin-left: 10px;" alt=""> -->
 
               <img src="/jira.svg" style="width: 16px;" @click="viewJiraPage(project)" alt="">
 
@@ -915,6 +915,7 @@
               })
 
               return
+
             }
 
             this.loading = project.title
