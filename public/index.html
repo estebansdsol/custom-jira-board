@@ -82,27 +82,14 @@
         <option :value="project.id || project.title" v-for="project in projects">{{ project.title }}</option>
       </select>
 
-      <!-- <input type="text" v-model="reminder.title" :placeholder="`${reminder.type === 'task' ? 'Task' : 'Reminder'}`"> -->
-
       <textarea v-model="reminder.title" placeholder="Task"></textarea>
 
-      <!-- <textarea v-model="reminder.description" placeholder="Additional Information"></textarea> -->
-
-      <!-- <div class="flex justify">
-        <input type="datetime-local" placeholder="" v-model="reminder.startdate" style="margin-right: 5px;">
-        <input type="datetime-local" placeholder="" v-model="reminder.duedate">
-      </div> -->
-
       <input v-if="reminder.type === 'reminder'" type="datetime-local" placeholder="" v-model="reminder.starttime">
-
-      <!-- <input v-if="reminder.type === 'reminder'" type="datetime-local" placeholder="" v-model="reminder.duedate"> -->
 
       <select v-if="reminder.type === 'reminder'" v-model="reminder.done">
         <option :value="true">Complete</option>
         <option :value="false">In Progress</option>
       </select>
-
-      <!-- <button v-if="reminder.id" class="button" style="background-color: #2ecc71;">Complete</button> -->
 
       <button class="button">{{ reminder.id ? 'Update' : 'Create' }}</button>
 
@@ -178,17 +165,9 @@
 
         <div class="card-actions" style="padding: 3px 10px">
 
-          <!-- <img src="/sync.svg" v-if="project.sync" @click="showDiff = (showDiff ? false : project)" style="width: 20px; margin-right: 5px; margin-left: 10px;" alt=""> -->
-
-          <!-- <img src="/refresh.svg" :class="`${ loading ? 'spin' : '' }`" style="width: 20px; margin-right: 5px; margin-left: 10px;" @click="refreshJira(project)" alt=""> -->
 
           <img src="/clipboard.svg" @click="copyToClipboard()" style="width: 15px; margin-right: 5px; margin-left: 5px;" alt="">
 
-          <!-- <img src="/jira.svg" style="width: 16px;" @click="viewJiraPage(project)" alt=""> -->
-
-          <!-- <img v-if="project.people" src="/email.svg" style="width: 20px;" @click="composeEmail(project)" alt=""> -->
-
-          <!-- <img src="/create.svg" @click="createTask(project)" style="width: 24px;" alt=""> -->
 
         </div>
 
@@ -315,7 +294,7 @@
 
             <div v-if="!showDiff" class="flex justify project-header">
 
-              <div v-if="projectReminders(project).length" class="card-item with-title" style="cursor: pointer; min-width: 25%;">
+              <div v-if="projectReminders(project).length && config && config.screens && config.screens.includes('todo')" class="card-item with-title" style="cursor: pointer; min-width: 25%;">
 
                 <div class="card-title">Reminders</div>
 
@@ -323,7 +302,6 @@
                   <div class="flex justify">
                     <span class="label-text">{{ task.title }}</span>
                   </div>
-                  <!-- <span :class="`tag ${tag(task)}`">{{ task.status }}</span> -->
                   <span v-if="task.done" :class="`tag ${tag(task)}`">Done</span>
                   <span v-if="!task.done" :class="`tag ${tag(task)}`">To Do</span>
                 </div>
@@ -548,6 +526,7 @@
               if (this.config && this.config.screens && this.config.screens.includes('todo')) {
                 this.setEvents()
               }
+              this.loading = false
             })
 
             setInterval(() => {
@@ -1022,9 +1001,9 @@
 
           },
 
-          load(cb) {
+          load(cb, refresh) {
 
-            this.loading = true
+            // this.loading = true
 
             axios.get('/api').then((res) => {
               
@@ -1044,7 +1023,7 @@
 
               if (cb) cb()
 
-              this.loading = false
+              // this.loading = false
 
             })
 
@@ -1146,8 +1125,6 @@
               .filter(a => a.title !== 'RCAT-CLIENT')
 
               .map(a => {
-
-              // a.tasks = this.filterTasksByDateRange(this.tasks)
 
               a.tasks = a.tasks.filter(b => {
                 if (!b.done && b.fields.duedate) return true
@@ -1649,4 +1626,5 @@
 </script>
   
 </body>
+
 </html>
