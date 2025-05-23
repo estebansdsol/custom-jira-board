@@ -1,7 +1,7 @@
 SDSOL Jira Task Manager
 =============
 
-A custom project management solution by Esteban <esteban@sdsol.com>.
+A custom project management solution by <esteban@sdsol.com>.
 
 ## Requirements
 
