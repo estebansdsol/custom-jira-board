@@ -1,0 +1,1652 @@
+<!DOCTYPE html>
+<html lang="en" >
+<head>
+
+  <meta charset="UTF-8">
+  <title>SDSOL - Task Management</title>
+
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-status-bar-style" content="transparent">
+  <meta name="mobile-web-app-title" content="SDSOL">
+
+  <link rel="icon" type="image/png" href="../favicon.png" />
+  <link rel="apple-touch-icon" href="favicon.png">
+  <link href="https://fonts.googleapis.com/css?family=DM+Sans:400,500,700&display=swap" rel="stylesheet">
+
+  <link href="timeline/css/jquery-ui.css" rel="stylesheet" />
+  <link href="timeline/css/jquery.ui.theme.css" rel="stylesheet" />
+
+  <link href="timeline/css/timelineScheduler.css" rel="stylesheet" />
+  <link href="timeline/css/timelineScheduler.styling.css" rel="stylesheet" />
+  <link href="timeline/css/calendar.css" rel="stylesheet" />
+  <link rel="stylesheet" href="./style.css">
+
+  <script src="timeline/js/moment.min.js"></script>
+  <script src="timeline/js/jquery-1.9.1.min.js"></script>
+  <script src="timeline/js/jquery-ui-1.10.2.min.js"></script>
+
+  <script src="timeline/js/timelineScheduler.js"></script>
+  <script src="timeline/js/vue.min.js"></script>
+  <script src="timeline/js/axios.min.js"></script>
+  <script src="timeline/js/leader-line.min.js"></script>
+
+  <script>
+    function colorMode() {
+      if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.classList.remove("light");
+        document.documentElement.classList.add("dark");
+      } else {
+        document.documentElement.classList.add("light");
+        document.documentElement.classList.remove("dark");
+      }
+    }
+    colorMode()
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+      colorMode()
+    });
+  </script>
+
+</head>
+<body>
+
+
+<div id="app" class="task-manager">
+
+
+  <div v-if="loading" id="loading">
+    <div>Loading projects...</div>
+  </div>
+
+
+  <div v-if="reminder" @click="reminder = false" class="reminder-backdrop"></div>
+
+  <div v-if="clipboard" @click="clipboard = false" class="reminder-backdrop"></div>
+
+  <div v-if="clipboard" class="create-reminder clipboard">
+    <div class="box" style="position: relative;">
+      <img src="./clipboard.svg" alt="">
+      <textarea v-model="clipboard" style=" min-width: 60vw; min-height: 400px; "></textarea>
+    </div>
+  </div>
+
+  <div v-if="reminder" class="create-reminder">
+    <form class="box" @submit.prevent="updateReminder()">
+
+      <div class="toggle">
+        <div @click="reminder.type = 'task'" :class="reminder.type === 'task' ? 'active' : ''">Task</div>
+        <div @click="reminder.type = 'reminder'" :class="reminder.type === 'reminder' ? 'active' : ''">Reminder</div>
+      </div>
+
+      <select v-model="reminder.project">
+        <option disabled>-- Project --</option>
+        <option :value="project.id || project.title" v-for="project in projects">{{ project.title }}</option>
+      </select>
+
+      <!-- <input type="text" v-model="reminder.title" :placeholder="`${reminder.type === 'task' ? 'Task' : 'Reminder'}`"> -->
+
+      <textarea v-model="reminder.title" placeholder="Task"></textarea>
+
+      <!-- <textarea v-model="reminder.description" placeholder="Additional Information"></textarea> -->
+
+      <!-- <div class="flex justify">
+        <input type="datetime-local" placeholder="" v-model="reminder.startdate" style="margin-right: 5px;">
+        <input type="datetime-local" placeholder="" v-model="reminder.duedate">
+      </div> -->
+
+      <input v-if="reminder.type === 'reminder'" type="datetime-local" placeholder="" v-model="reminder.starttime">
+
+      <!-- <input v-if="reminder.type === 'reminder'" type="datetime-local" placeholder="" v-model="reminder.duedate"> -->
+
+      <select v-if="reminder.type === 'reminder'" v-model="reminder.done">
+        <option :value="true">Complete</option>
+        <option :value="false">In Progress</option>
+      </select>
+
+      <!-- <button v-if="reminder.id" class="button" style="background-color: #2ecc71;">Complete</button> -->
+
+      <button class="button">{{ reminder.id ? 'Update' : 'Create' }}</button>
+
+      <a v-if="reminder.id" @click="deleteReminder(reminder)" style=" text-align: center; margin-top: 10px; color: red; cursor: pointer; ">Delete</a>
+
+    </form>
+  </div>
+
+  <div class="left-bar">
+
+    <div class="left-content">
+
+        <div class="toggle">
+          <div v-if="config.screens && config.screens.includes('tasks')" @click="view = 'schedule'" :class="view === 'schedule' ? 'active' : ''">Tasks</div>
+          <div v-if="config.screens && config.screens.includes('gantt')" @click="view = 'timeline'" :class="view === 'timeline' ? 'active' : ''">Gantt</div>
+          <div v-if="config.screens && config.screens.includes('text')" @click="view = 'text'" :class="view === 'text' ? 'active' : ''">Text</div>
+        </div>
+
+      <ul class="category-list">
+        <li v-for="i in projectsSorted" :class="`item ${i.active ? 'active' : ''}`" @click="(event) => setActive(event, i)">
+
+            <svg v-if="!i.active && !i.sla" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+            class="feather feather-hash">
+            <line x1="4" y1="9" x2="20" y2="9" />
+            <line x1="4" y1="15" x2="20" y2="15" />
+            <line x1="10" y1="3" x2="8" y2="21" />
+            <line x1="16" y1="3" x2="14" y2="21" /></svg>
+
+            <svg style=" fill: #8e92a4; stroke: #8e92a4; " v-if="i.active || i.sla"xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+            class="feather feather-star">
+            <polygon
+              points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+            </svg>
+
+          <span :style="`${ i.done ? 'text-decoration: line-through;' : '' }`">{{ i.title }} 
+            
+            <span v-if="sidebarCount(i)" class="number in-progress">{{ sidebarCount(i) }}</span>
+
+          </span>
+        </li>
+      </ul>
+
+      <ul class="category-list second" style="margin-top: 30px">
+        <li v-for="lead in leads" :class="`item ${filterByLead === lead ? 'active' : ''}`" @click="filterByLeadAction(lead)">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+            class="feather feather-users">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+            <circle cx="9" cy="7" r="4" />
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+            <path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+          <span>{{ lead }}</span>
+        </li>
+      </ul>
+
+
+    </div>
+  </div>
+
+  <div v-if="view === 'timeline'" ref="scrollArea" class="page-content">
+    
+    <div class="timeline"></div>
+
+  </div>
+
+  <div v-if="view === 'text'" ref="scrollArea" class="page-content">
+
+    <div class="card-item with-title">
+
+        <div class="card-title">Task Management</div>
+
+        <div class="card-actions" style="padding: 3px 10px">
+
+          <!-- <img src="/sync.svg" v-if="project.sync" @click="showDiff = (showDiff ? false : project)" style="width: 20px; margin-right: 5px; margin-left: 10px;" alt=""> -->
+
+          <!-- <img src="/refresh.svg" :class="`${ loading ? 'spin' : '' }`" style="width: 20px; margin-right: 5px; margin-left: 10px;" @click="refreshJira(project)" alt=""> -->
+
+          <img src="/clipboard.svg" @click="copyToClipboard()" style="width: 15px; margin-right: 5px; margin-left: 5px;" alt="">
+
+          <!-- <img src="/jira.svg" style="width: 16px;" @click="viewJiraPage(project)" alt=""> -->
+
+          <!-- <img v-if="project.people" src="/email.svg" style="width: 20px;" @click="composeEmail(project)" alt=""> -->
+
+          <!-- <img src="/create.svg" @click="createTask(project)" style="width: 24px;" alt=""> -->
+
+        </div>
+
+        <div class="text-area" v-html="renderedText"></div>
+
+    </div>
+    
+
+  </div>
+
+  <div v-if="view === 'schedule'" ref="scrollArea" class="page-content" >
+
+    <div>
+      
+
+      <div class="tasks-wrapper" style="padding-top: 15px !important">
+
+        <div class="card-items" v-if="false">
+
+          <div class="card-item">
+            {{ projects.length }}
+            <div class="card-label">Total Projects</div>
+          </div>
+
+          <div class="card-item">
+            {{ projects.length }}
+            <div class="card-label">Active Projects</div>
+          </div>
+
+          <div class="card-item">
+            {{ projects.filter(a => a.sla).length }}
+            <div class="card-label">Active SLA</div>
+          </div>
+          
+        </div>
+
+        <div>
+          
+
+        <div class="card-item with-title" v-for="project in (filtered.length ? filtered : projects)" style="cursor: pointer;">
+
+            <div class="card-title">{{ project.longTitle || project.title }}</div>
+
+            <div class="card-actions">
+
+              <img src="/sync.svg" v-if="project.sync" @click="showDiff = (showDiff ? false : project)" style="width: 20px; margin-right: 5px; margin-left: 10px;" alt="">
+
+              <img src="/refresh.svg" :class="`${ loading === project.title ? 'spin' : '' }`" style="width: 20px; margin-right: 5px; margin-left: 10px;" @click="refreshJira(project)" alt="">
+
+              <img src="/todo.svg" @click="generateClipboard(project)" style="width: 20px; margin-right: 5px; margin-left: 10px;" alt="">
+
+              <img src="/jira.svg" style="width: 16px;" @click="viewJiraPage(project)" alt="">
+
+              <img v-if="project.people" src="/email.svg" style="width: 20px;" @click="composeEmail(project)" alt="">
+
+              <img src="/create.svg" @click="createTask(project)" style="width: 24px;" alt="">
+
+            </div>
+
+            <div class="progress-container">
+                <div class="progress-bar" :style="{ width: project.percent + '%' }"></div>
+                <div class="progress-label" :style="`${project.percent > 49 ? 'color: white' : 'color: #6b6b6b'}`">{{ project.percent }}%</div>
+            </div>
+
+            <div v-if="showDiff" class="flex justify project-header" ref="lineContainer">
+
+
+              <div class="card-item with-title" style="cursor: pointer; min-width: 45%; margin-bottom: 0;">
+
+                <div class="card-title">{{ showDiff.title }}</div>
+
+                <div class="card-actions">
+
+                  <img src="/todo.svg" @click="generateClipboard(showDiff)" style="width: 20px; margin-right: 5px; margin-left: 10px;" alt="">
+
+                </div>
+
+                <div v-for="task in sortJiraTasksByPriority(showDiff)" class="task" @click="click(task)"
+
+                  :key="'left-' + task.key"
+                  :ref="'left-' + task.key"
+
+                >
+
+                  <div class="flex justify">
+                    <div class="members" style="margin-top:0; margin-right: 5px">
+                      <div :style="`background-color: ${displayNameColor(task)}`">{{ displayName(task) }}</div>
+                    </div>
+                    <span class="label-text"><b>{{ task.key }}:</b> {{ task.fields.summary }}</span>
+                  </div>
+                  <span :class="`tag ${tag(task)}`">{{ task.fields.status.name }}</span>
+                </div>
+
+              </div>
+
+
+              <div class="card-item with-title" style="cursor: pointer; min-width: 45%; margin-bottom: 0;">
+
+                <div class="card-title">{{ diffProject.title }}</div>
+
+                <div class="card-actions">
+
+                  <img src="/todo.svg" @click="generateClipboard(diffProject)" style="width: 20px; margin-right: 5px; margin-left: 10px;" alt="">
+
+                </div>
+
+                <div v-for="task in sortJiraTasksByPriority(diffProject)" class="task" @click="click(task)"
+                  :key="'right-' + task.key"
+                  :ref="'right-' + task.key"
+                >
+                  <div class="flex justify">
+                    <div class="members" style="margin-top:0; margin-right: 5px">
+                      <div :style="`background-color: ${displayNameColor(task)}`">{{ displayName(task) }}</div>
+                    </div>
+                    <span class="label-text"><b>{{ task.key }}:</b> {{ task.fields.summary }}</span>
+                  </div>
+                  <span :class="`tag ${tag(task)}`">{{ task.fields.status.name }}</span>
+                </div>
+
+              </div>
+              
+
+            </div>
+
+            <div v-if="!showDiff" class="flex justify project-header">
+
+              <div v-if="projectReminders(project).length" class="card-item with-title" style="cursor: pointer; min-width: 25%;">
+
+                <div class="card-title">Reminders</div>
+
+                <div v-for="task in projectReminders(project)" class="task" @click="click(task)" :style="`task.done ? 'text-decoration: line-through' : ''`">
+                  <div class="flex justify">
+                    <span class="label-text">{{ task.title }}</span>
+                  </div>
+                  <!-- <span :class="`tag ${tag(task)}`">{{ task.status }}</span> -->
+                  <span v-if="task.done" :class="`tag ${tag(task)}`">Done</span>
+                  <span v-if="!task.done" :class="`tag ${tag(task)}`">To Do</span>
+                </div>
+
+              </div>
+              
+              <div v-if="project.milestones" v-for="milestone in project.milestones" class="card-item with-title" style="cursor: pointer; min-width: 33%; margin-bottom: 0;">
+
+                <div class="card-title" >{{ milestone.title }}</div>
+
+                <div class="progress-container" style="margin-bottom: 20px;">
+                    <div class="progress-bar" :style="{ width: milestone.percent + '%' }"></div>
+                    <div class="progress-label" :style="`${milestone.percent > 49 ? 'color: white' : 'color: #6b6b6b'}`">{{ milestone.percent }}%</div>
+                </div>
+
+                <div v-for="task in milestone.tasks" class="task" @click="click(task)">
+                  <div class="flex justify">
+                    <div class="members" style="margin-top:0; margin-right: 5px">
+                      <div :style="`background-color: ${displayNameColor(task)}`">{{ displayName(task) }}</div>
+                    </div>
+                    <span class="label-text"><b>{{ task.key }}:</b> {{ task.fields.summary }}</span>
+                  </div>
+                  <span :class="`tag ${tag(task)}`">{{ task.fields.status.name }}</span>
+                </div>
+
+              </div>
+
+
+
+              <div v-if="!project.milestones && project.tasks.filter(a => a.sla).length" class="card-item with-title" style="cursor: pointer; min-width: 25%;">
+
+                <div class="card-title">Service Agreement</div>
+
+                <div v-for="task in project.tasks.filter(a => a.sla)" class="task" @click="click(task)">
+                  <div class="flex justify">
+                    <div class="members" style="margin-top:0; margin-right: 5px">
+                      <div :style="`background-color: ${displayNameColor(task)}`">{{ displayName(task) }}</div>
+                    </div>
+                    <span class="label-text"><b>{{ task.key }}:</b> {{ task.fields.summary }}</span>
+                  </div>
+                </div>
+
+              </div>
+              
+              <div v-if="!project.milestones" class="card-item with-title" style="cursor: pointer; min-width: 25%;">
+
+                <div class="card-title">Backlog</div>
+
+                <div v-for="task in project.tasks.filter(a => !a.done && !a.pending && !a.sla)" class="task" @click="click(task)">
+                  <div class="flex justify">
+                    <div class="members" style="margin-top:0; margin-right: 5px">
+                      <div :style="`background-color: ${displayNameColor(task)}`">{{ displayName(task) }}</div>
+                    </div>
+                    <span class="label-text"><b>{{ task.key }}:</b> {{ task.fields.summary }}</span>
+                  </div>
+                  <span :class="`tag ${tag(task)}`">{{ task.fields.status.name }}</span>
+                </div>
+
+              </div>
+              
+              <div v-if="!project.milestones" class="card-item with-title" style="cursor: pointer; min-width: 25%;">
+
+                <div class="card-title">In Progress</div>
+
+                <div v-for="task in project.tasks.filter(a => a.pending && !a.sla)" class="task" @click="click(task)">
+                  <div class="flex justify">
+                    <div class="members" style="margin-top:0; margin-right: 5px">
+                      <div :style="`background-color: ${displayNameColor(task)}`">{{ displayName(task) }}</div>
+                    </div>
+                    <span class="label-text"><b>{{ task.key }}:</b> {{ task.fields.summary }}</span>
+                  </div>
+                  <span :class="`tag ${tag(task)}`">{{ task.fields.status.name }}</span>
+                </div>
+
+              </div>
+
+
+              <div v-if="!project.milestones" class="card-item with-title" style="cursor: pointer; min-width: 25%;">
+
+                <div class="card-title">Done</div>
+
+                <div v-for="task in project.tasks.filter(a => a.done).slice(0, 12)" class="task" @click="click(task)">
+                  <div class="flex justify">
+                    <div class="members" style="margin-top:0; margin-right: 5px;">
+                      <div :style="`background-color: ${displayNameColor(task)}`">{{ displayName(task) }}</div>
+                    </div>
+                    <span class="label-text"><b>{{ task.key }}:</b> {{ task.fields.summary }}</span>
+                  </div>
+                  <span :class="`tag ${tag(task)}`">{{ task.fields.status.name }}</span>
+                </div>
+
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+
+      </div>
+
+
+    </div>
+
+
+  </div>
+
+  <div v-if="false" class="right-bar">
+ 
+    <div class="right-content">
+
+      <div class="header flex justify" style="margin-top: 5px; margin-left: 0;">
+        <div>My Tasks</div>
+        <div @click="newReminder()">
+          <img src="/create.svg" class="dark-invert" style="width: 30px; opacity: 0.5; cursor: pointer;" alt="">
+        </div>
+      </div>
+      
+      <div :class="`task-box ${ item.done ? 'green' : 'yellow' }`" v-for="item in schedule" @click="item.key ? click(item) : reminder = item">
+        <div class="description-task">
+          <div class="time"><b>{{ item.project }} </b> - {{ moment(item.duedate).format('dddd MMMM, D') }}</div>
+          <div class="task-name">{{ item.title }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div v-if="view !== 'timeline' && config.screens && config.screens.includes('todo')" class="right-bar">
+ 
+    <div class="right-content">
+
+      <div class="header flex justify" style="margin-top: 5px; margin-left: 0;">
+        <div class="flex justify">
+          <div @click="subtractEventDate()" style="cursor: pointer; padding-right: 10px; opacity: 0.5">&#8592;</div>
+          <div>{{ eventDateLabel }}</div>
+          <div @click="addEventDate()" style="cursor: pointer; padding-left: 10px; opacity: 0.5">&#8594;</div>
+        </div>
+        <div @click="newReminder()">
+          <img src="/create.svg" class="dark-invert" style="width: 30px; opacity: 0.5; cursor: pointer;" alt="">
+        </div>
+      </div>
+      
+       <div class="calendar">
+        <!-- Red line representing current time -->
+        <div v-if="moment(eventDate).isSame(moment(), 'day')" class="time-line" :style="{ top: currentTimePosition + 'px' }"></div>
+
+        <!-- Time blocks -->
+        <div v-for="hour in hours" :key="hour" class="hour-block" @click="newReminder(hour)">
+          <div class="hour-label">{{ formatHour(hour) }}</div>
+          <div style="display: flex;">            
+            <div
+              v-for="(event, index) in getEventsForHour(hour)"
+              :key="event.id"
+              :class="`event ${event.key ? '' : 'reminder'}`"
+              :style="`${event.done ? 'background: #22ab5c;text-decoration: line-through;': ''}`"
+              @click.stop="click(event)">
+              {{ event.title }}
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+
+<script>
+
+    window.jira = new Vue({
+        el: '#app',
+        data: {
+
+            view: localStorage.getItem('view-mode') || 'schedule',
+
+            reminders: [],
+
+            clipboard: false,
+
+            showDiff: false,
+
+            loaded: false,
+
+            loading: true,
+
+            reminder: false,
+
+            progress: 30,
+            
+            filterByUser: '',
+            filterByLead: '',
+
+            filterByDesigner: '',
+
+            filter: 'in-progress',
+
+            issues: [],
+
+            projects: [],
+
+            config: {},
+
+
+            eventDate: moment(),
+
+            startHour: 7,
+
+            endHour: 22,
+
+            events: [],
+            
+            lines: [],
+
+            currentTimePosition: 0,
+
+        },
+        mounted() {
+
+            this.load(() => {
+              if (this.config && this.config.screens && this.config.screens.includes('todo')) {
+                this.setEvents()
+              }
+            })
+
+            setInterval(() => {
+              this.load()
+            }, 300000)
+
+            this.loaded = true
+
+            this.updateCurrentTimeLine();
+
+            setInterval(this.updateCurrentTimeLine, 60000);
+
+        },
+        methods: {
+
+
+          filterTasksByDateRange(tasks, range) {
+            const today = moment().startOf('day');
+            let start, end;
+
+            switch (range) {
+              case 'thisMonth':
+                start = moment().startOf('month');
+                end = moment().endOf('month');
+                break;
+
+              case 'lastMonth':
+                start = moment().subtract(1, 'month').startOf('month');
+                end = moment().subtract(1, 'month').endOf('month');
+                break;
+
+              case 'thisWeek':
+                start = moment().startOf('isoWeek');
+                end = moment().endOf('isoWeek');
+                break;
+
+              case 'lastWeek':
+                start = moment().subtract(1, 'week').startOf('isoWeek');
+                end = moment().subtract(1, 'week').endOf('isoWeek');
+                break;
+
+              default:
+                throw new Error(`Unsupported range: ${range}`);
+            }
+
+            return tasks.filter(task => {
+              const due = task.fields?.duedate && moment(task.fields.duedate);
+              return due && due.isSameOrAfter(start) && due.isSameOrBefore(end);
+            });
+          },
+
+          async copyToClipboard(text) {
+            try {
+              await navigator.clipboard.writeText(this.renderedText);
+              console.log('Text copied to clipboard');
+            } catch (err) {
+              console.error('Failed to copy text: ', err);
+            }
+          },
+
+
+          generateClipboardRaw(project) {
+            const limit = 60;
+            const groups = {};
+            const dayDates = {};
+            const today = moment().startOf('day');
+
+            var noDueDate = `<b>No Due-Date</b>`
+            
+            groups[noDueDate] = [];
+
+            project.tasks
+              .filter(task => task.fields.duedate || task.pending || task.done)
+              .forEach(task => {
+                const title = task.fields.summary.split('(')[0];
+                const trimmed = title.length >= limit ? title.slice(0, limit) + '...' : title;
+
+
+                const classes = [];
+                
+                if (task.done) classes.push('done');
+                
+                if (task.fields.duedate && moment(task.fields.duedate).startOf('day').isBefore(today) && !task.done) {
+                  classes.push('late');
+                }
+
+                const classAttr = classes.length ? ` class="${classes.join(' ')}"` : '';
+                const line = `<span${classAttr}>${task.key}: ${trimmed} - <a href="${this.config.jira_url}/browse/${task.key}" target="_blank">${this.config.jira_url}/browse/${task.key}</a></span>`;
+
+
+                if (!task.fields.duedate) {
+                  groups[noDueDate].push(line);
+                } else {
+                  const dueDate = moment(task.fields.duedate).startOf('day');
+                  const dayLabel = dueDate.format('dddd'); // Monday, Tuesday, etc.
+                  const formattedDate = dueDate.format('MMMM D'); // April 15
+
+                  const groupKey = `<b>Due ${dayLabel} (${formattedDate})</b>`;
+
+                  if (!groups[groupKey]) {
+                    groups[groupKey] = [];
+                    dayDates[groupKey] = dueDate;
+                  }
+
+                  groups[groupKey].push(line);
+                }
+              });
+
+            
+            // Sort the groups by due date
+            const sortedKeys = Object.keys(groups).filter(k => k !== noDueDate)
+              .sort((a, b) => dayDates[a].diff(dayDates[b]));
+
+            let text = '';
+
+            sortedKeys.forEach(key => {
+              text += `${key}<br><br>`;
+              groups[key].forEach(line => text += `- ${line}<br>`);
+              text += '<br>';
+            });
+
+
+            if (groups[noDueDate].length) {
+              text += `${noDueDate}<br><br>`;
+              groups[noDueDate].forEach(line => text += `- ${line}<br>`);
+            }
+
+            return text.trim();
+          },
+
+          generateClipboard(project) {
+
+            this.clipboard = this.generateClipboardRaw(project)
+
+          },
+
+
+          updateLines() {
+            this.lines.forEach(line => line.position());
+          },
+
+          sortJiraTasksByPriority(project) {
+
+            var tasks = []
+
+            if (project.milestones) {
+              tasks = project.milestones.filter(a => a.title !== 'SLA')[0].tasks
+            } else {
+              tasks = project.tasks.filter(a => a.pending)
+            }
+
+            tasks = JSON.parse(JSON.stringify(tasks))
+
+            const priorityOrder = {
+              "Highest": 0,
+              "High": 1,
+              "Medium": 2,
+              "Low": 3
+            };
+
+            return tasks.sort((a, b) => {
+              // if (a.done && !b.done) return -1;
+              // if (!a.done && b.done) return 1;
+              const priorityA = priorityOrder[a.fields.priority.name] ?? Infinity;
+              const priorityB = priorityOrder[b.fields.priority.name] ?? Infinity;
+              return priorityA - priorityB;
+            })
+
+          },
+
+          projectReminders(project) {
+            return this.reminders.filter(a => a.project === project.title).sort((a, b) => {
+              if (a.done === b.done) return 0;
+              return !a.done ? -1 : 1;
+            })
+          },
+
+          subtractEventDate() {
+            this.eventDate = moment(this.eventDate).subtract(1, 'day')
+            this.setEvents()
+          },
+
+          addEventDate() {
+            this.eventDate = moment(this.eventDate).add(1, 'day')
+            this.setEvents()
+          },
+
+          setEvents() {
+
+            var events = []
+
+            this.schedule.filter(a => moment(a.duedate).isSame(moment(this.eventDate), "day")).map((a, id) => {
+              events.push( { 
+                id, 
+                title: `${a.project}: ${a.title}`, 
+                time: moment(a.starttime).format('HH:MM'),
+                status: a.status,
+                done: a.done,
+                key: a.key
+              } )
+            })
+
+            this.events = events
+
+            this.setReminders()
+
+          },
+
+          setReminders() {
+
+            axios.get('/reminders').then((res) => {
+
+              this.reminders = res.data
+      
+              var events = []
+
+              res.data.filter(a => moment(a.starttime).isSame(moment(this.eventDate), "day")).map((a, id) => {
+                events.push( { 
+                  id, 
+                  title: `${a.project}: ${a.title}`, 
+                  time: moment(a.starttime).format('HH:MM'),
+                  task: a,
+                  done: a.done
+                } )
+              })
+
+              events.map(a => this.events.push(a))
+
+            })
+
+
+          },
+
+          formatHour(hour) {
+            const ampm = hour >= 12 ? 'PM' : 'AM';
+            const displayHour = hour > 12 ? hour - 12 : hour;
+            return `${displayHour} ${ampm}`;
+          },
+
+          getEventsForHour(hour) {
+            return this.events.filter(event => {
+              const eventHour = parseInt(event.time.split(':')[0]);
+              return eventHour === hour;
+            });
+          },
+
+          getTimeFromPosition(topPx) {
+            const totalMinutes = Math.max(0, Math.round(topPx));
+            const hour = this.startHour + Math.floor(totalMinutes / 60);
+            const minute = totalMinutes % 60;
+            const pad = n => (n < 10 ? '0' + n : n);
+            return `${pad(hour)}:${pad(minute)}`;
+          },
+
+          updateCurrentTimeLine() {
+            const now = new Date();
+            const hours = now.getHours();
+            const minutes = now.getMinutes();
+            const totalMinutes = (hours - this.startHour) * 60 + minutes;
+            this.currentTimePosition = totalMinutes;
+          },
+
+          sidebarCount(project) {
+            if (this.config && this.config.watch.includes('backlog') && this.config.watch.includes('in-progress')) {
+              return project.tasks.filter(a => (!a.done || a.pending) && !a.sla).length
+            }
+            if (this.config && this.config.watch.includes('backlog')) {
+              return project.tasks.filter(a => !a.done && !a.sla).length
+            }
+            if (this.config && this.config.watch.includes('in-progress')) {
+              return project.tasks.filter(a => a.pending && !a.sla).length
+            }
+            return project.tasks.filter(a => a.pending && !a.sla).length
+          },
+
+          displayName(task) {
+            return task.fields.assignee ? task.fields.assignee.displayName[0].toUpperCase() : ''
+          },
+
+          generateHexColor(input) {
+            const coloredString = input.toLowerCase().split('').map((char) => {
+              return char.charCodeAt(0).toString(16);
+            }).join('');
+            return `#${coloredString.slice(0, 6)}`;
+          },
+
+          displayNameColor(task) {
+            var displayName = task.fields.assignee ? task.fields.assignee.displayName[0] : ''
+            if (!displayName) return '#6c6c6c'
+            return this.generateHexColor(displayName)
+          },
+
+          newReminder(hour) {
+
+            this.reminder = {
+
+              type: 'reminder',
+
+              starttime: hour ? moment(this.eventDate).hour(hour).startOf('hour').format('YYYY-MM-DDTHH:mm:ss.SSS') : moment().startOf('hour').format('YYYY-MM-DDTHH:mm:ss.SSS'),
+
+              duedate: hour ? moment(this.eventDate).hour(hour + 1).format('YYYY-MM-DD HH:mm:ss') : moment().startOf('hour').add(1, 'hour').format('YYYY-MM-DD HH:mm:ss'),
+
+              repeat: '',
+
+              project: this.filtered[0] ? (this.filtered[0].id || this.filtered[0].title) : '',
+              
+              parent: this.filtered[0] && this.filtered[0].epic ? this.filtered[0].epic : null,
+
+              status: 'in-progress'
+
+            }
+
+          },
+
+          updateReminder() {
+            
+            if (!this.reminder.project) return alert('Missing project')
+
+            if (this.loading) return
+
+            this.loading = this.reminder.project
+
+            if (this.reminder.type === 'task') {
+
+              axios.post('/tasks', this.reminder).then(() => {
+                this.refreshJira({ title: this.reminder.project })
+                this.reminder = false
+              })
+
+            } else {
+
+              if (this.reminder.id) {
+                axios.post('/reminders/' + this.reminder.id, this.reminder).then(() => {
+                  this.setEvents()
+                  this.reminder = false
+                })
+                this.loading = false
+                return
+              }
+
+              axios.post('/reminders', this.reminder).then(() => {
+                this.setEvents()
+                this.reminder = false
+                this.loading = false
+              })
+
+            }
+            
+          },
+
+          completeReminder(reminder) {
+            
+            axios.post('/reminders/' + reminder.id).then(() => {
+              this.setEvents()
+              this.reminder = false
+            })
+          
+          },
+
+          deleteReminder(reminder) {
+            
+            axios.delete('/reminders/' + reminder.id).then(() => {
+              this.setEvents()
+              this.reminder = false
+            })
+          
+          },
+
+          refreshJira(project) {
+
+            if (this.showDiff) {
+
+              this.loading = project.title
+
+              axios.post('/refresh/' + project.id, { jira: project.jira }).then(() => {
+                this.load(() => {
+                  this.showDiff = this.projects.find(a => a.id === this.showDiff.id)
+                })
+                // this.showDiff = this.projects.find(a => a.id === this.showDiff.id)
+                axios.post('/refresh/' + this.showDiff.sync, { jira: this.diffProject.jira }).then(() => {
+                  this.loading = false
+                  this.load(() => {
+                    this.showDiff = this.projects.find(a => a.id === this.showDiff.id)
+                  })
+                })
+              })
+
+              return
+            }
+
+            this.loading = project.title
+
+            axios.post('/refresh/' + (project.id || project.title)).then(() => {
+              this.loading = false
+              this.load(() => {
+                this.setEvents()
+              })
+            })
+
+          },
+
+          composeEmail( project ) {
+            axios.post('/email', { people: project.people, title: project.longTitle || project.title })
+          },
+
+          viewJiraPage( project ) {
+            window.open(`${this.config.jira_url}/jira/software/c/projects/${project.title}/list`, '_blank').focus();
+          },
+
+          createTask( project ) {
+            window.open(`${this.config.jira_url}/secure/CreateIssue.jspa?pid=${project.tasks[0].fields.project.id}`, '_blank').focus();
+          },
+
+          getLatestMonthName() {
+              const today = new Date();
+              today.setMonth(today.getMonth()); // Move to the previous month
+              return today.toLocaleString('en-US', { month: 'long' });
+          },
+
+          filterIssuesByMonth(issues, year, month) {
+              return issues.filter(issue => {
+                  const createdDate = new Date(issue.fields.created);
+                  return createdDate.getFullYear() === year && createdDate.getMonth() === month - 1;
+              });
+          },
+
+          consumed(project) {
+
+            var consumed = 0
+
+            var tasks = this.filterIssuesByMonth(project.tasks, (new Date).getFullYear(), (new Date).getMonth() + 1)
+
+            tasks.map(task => {
+              if (task.fields.timespent) consumed += task.fields.timespent
+            })
+
+            return Math.floor(consumed / 3600)
+
+          },
+
+          setActive(event, project) {
+
+            if (event.shiftKey || event.metaKey) {
+
+              project.active = !project.active
+
+            } else {
+
+              if (!project.active) {
+
+                this.projects.map(a => {
+                  a.active = false
+                })
+
+              }
+
+              project.active = !project.active
+
+            }
+
+            this.showDiff = false
+
+            this.filterByLead = ''
+
+            localStorage.setItem('activeProjects', this.projects.filter(a => a.active).map(a => a.title).join(','))
+            
+            if (this.view === 'timeline') this.Calendar.Init(true)
+
+            // if (this.view === 'text') this.view = 'schedule'
+            
+            this.$forceUpdate()
+
+          },
+
+          load(cb) {
+
+            this.loading = true
+
+            axios.get('/api').then((res) => {
+              
+              this.config = res.data.config
+              this.projects = res.data.projects
+
+              if (this.view === 'timeline') this.Calendar.Init(true)
+
+              if (localStorage.getItem('activeProjects')) {
+                localStorage.getItem('activeProjects').split(',').map(a => {
+                  for (var project of this.projects) {
+                    if (project.title === a) project.active = true
+                  }
+                })
+                this.$forceUpdate()
+              }
+
+              if (cb) cb()
+
+              this.loading = false
+
+            })
+
+          },
+
+
+          click(task) {
+
+            if (!task.key) {
+              var task = task.task
+                  task.type = 'reminder'
+              return this.reminder = task
+            }
+            
+            window.open(`${task.jiraUrl || this.config.jira_url}/browse/${task.key}`, '_blank').focus();
+
+          },
+
+          tag(task) {
+
+            if (!task.done && !task.pending) return 'backlog'
+
+            if (!task.fields) return 'approved'
+
+            if (task.fields.status.name === 'Ready For Dev') return 'backlog'
+
+            if (task.fields.status.name === 'QA Done (Staging)') return 'approved'
+            if (task.fields.status.name === 'QA Done (Production)') return 'approved'
+            if (task.fields.status.name === 'Ready for QA (Production)') return 'approved'
+            if (task.fields.status.name === 'Ready for QA (Staging)') return 'approved'
+            if (task.fields.status.name === 'PM Review') return 'approved'
+
+            if (task.done) return 'approved'
+            
+            if (!task.done) return 'progress'
+
+          },
+
+          tasks(filter, tasksOnly) {
+
+            var tasks = []
+            
+            this.filtered(filter).map(a => a.tasks.map(task => tasks.push(task)))
+
+            return tasks
+
+          },
+
+          filterByDesignerAction(designer) {
+
+            this.projects.map(a => {
+              a.active = false
+            })
+
+            this.filterByLead = ''
+
+            if (this.filterByDesigner === designer) {
+              this.filterByDesigner = ''
+            } else {
+              this.filterByDesigner = designer
+            }
+
+            if (this.view === 'timeline') this.Calendar.Init(true)
+
+          },
+
+          filterByLeadAction(lead) {
+
+            if (this.filterByLead === lead) {
+              this.filterByLead = ''
+              this.projects.map(a => {
+                a.active = false
+              })
+            } else {
+              this.projects.map(a => {
+                a.active = false
+              })
+              this.projects.filter(a => a.lead && a.lead.includes(lead)).map(a => {
+                a.active = true
+              })
+              this.filterByLead = lead
+            }
+
+            this.filterByDesigner = ''
+
+            if (this.view === 'timeline') this.Calendar.Init(true)
+
+          },
+
+        },
+        computed: {
+
+          renderedText() {
+
+            var text = ''
+
+            JSON.parse(JSON.stringify(this.filtered))
+
+              .filter(a => a.title !== 'RCAT-CLIENT')
+
+              .map(a => {
+
+              // a.tasks = this.filterTasksByDateRange(this.tasks)
+
+              a.tasks = a.tasks.filter(b => {
+                if (!b.done && b.fields.duedate) return true
+                return b.pending
+              })
+
+              return a
+
+            })
+
+            .sort((a, b) => b.tasks.length - a.tasks.length)
+
+            .map(a => {
+
+              var title = a.longTitle || a.title || a.id
+
+              if (a.tasks.length) {
+                text += `<h3>${title}</h3>${this.generateClipboardRaw(a)}`
+              } else {
+                text += `<h3>${title}</h3><br>Nothing Pending<br><br>`
+              }
+
+            })
+
+            return text
+
+          },
+
+          diffProject() {
+            return this.projects.find(a => a.id === this.showDiff.sync)
+          },
+
+          leads() {
+            var leads = []
+            this.projects.map(a => {
+              if (a.lead) a.lead.map(b => {
+                if (!leads.includes(b)) leads.push(b)
+              })
+            })
+            return leads
+          },
+
+          eventDateLabel() {
+            return moment(this.eventDate).isSame(moment(), "day") ? moment().format('dddd') : moment(this.eventDate).format('dddd')
+          },
+
+          hours() {
+            const length = this.endHour - this.startHour + 1;
+            return Array.from({ length }, (_, i) => i + this.startHour);
+          },
+
+          calendarHeight() {
+            return (this.endHour - this.startHour) * 60;
+          },
+
+          projectsSorted() {
+            return this.projects.sort((a, b) => {
+              if (a.done === b.done) return 0;
+              return !a.done ? -1 : 1;
+            })
+          },
+
+          schedule() {
+
+            var my_tasks = []
+
+            this.projects.map(a => {
+
+              a.tasks.map(b => {
+
+                if (b.fields.assignee && b.fields.assignee.emailAddress === this.config.email) {
+                  my_tasks.push({
+                    project: (a.id || a.title),
+                    title: b.fields.summary,
+                    assignee: 'E',
+                    key: b.key,
+                    done: b.done,
+                    duedate: b.fields.duedate,
+                    starttime: b.fields.customfield_10008,
+                  })
+                }
+              })
+
+            })
+
+            return my_tasks
+            .sort((a, b) => {
+              const aTime = a.duedate ? new Date(a.duedate).getTime() : Infinity;
+              const bTime = b.duedate ? new Date(b.duedate).getTime() : Infinity;
+              return aTime - bTime;
+            })
+            .sort((a, b) => a.done - b.done)
+
+          },
+
+          Calendar() {
+
+            var items = []
+            var today = moment().startOf('day');
+
+            this.filtered.map(project => {
+
+              if (project.milestones) {
+
+                project.milestones
+
+                .map(milestone => {
+
+                  for (var b of milestone.tasks) {                  
+                    b.startdate = b.fields.customfield_10008
+                    b.duedate = b.fields.duedate
+                  }
+
+                  milestone.tasks.map(task => {
+
+                    items.push({
+                      id: project.title.split(' ').join('-') + task.fields.summary.split(' ').join('-'),
+                      project: project.longTitle,
+                      title: task.fields.summary,
+                      done: task.fields.status.name === 'done',
+                      milestone: milestone.title,
+                      fields: task.fields,
+                      name: `<div class="flex" style=" align-items: center; "> <div class="circled" style="${task.fields.assignee ? '' : 'display: none'}; background-color: ${this.displayNameColor(task)}">${this.displayName(task)}</div> <div> <div class="title">${task.fields.summary}</div> <div class="key">${task.key}</div> </div> </div>`,
+                      sectionID: project.title.split(' ').join('_'),
+                      start: moment(task.startdate || task.fields.created).startOf('day'),
+                      end: moment(task.duedate || task.fields.resolutiondate || moment(today).add('days', 1)).endOf('day'),
+                      key: task.key,
+                      classes: 'item-status-' + task.fields.issuetype.name.toLowerCase() + ' ' + task.fields.status.name.split(' ').join('-').toLowerCase() + ' ' + milestone.title.split(' ').join('-').toLowerCase(),
+                    })
+
+                  })
+
+                })
+
+
+              } else {
+
+
+                project.tasks
+
+                .filter(issue => {
+                  if (issue.fields.summary.toLowerCase().includes('management hours')) return false
+                  if (issue.fields.parent && issue.fields.parent.fields.summary && ( issue.fields.parent.fields.summary.includes('QA') || issue.fields.parent.fields.summary.includes('Quality Assurance') )) return false
+                  return true
+                })
+
+                .map(issue => {
+
+
+                  var end = issue.done ? moment(issue.fields.updated).endOf('day') : (issue.fields.duedate ? moment(issue.fields.duedate) : moment(today).add('days', 1))
+                  
+                  if (issue.fields.status.name.split(' ').join('-').toLowerCase() === 'to-do' || issue.fields.status.name.split(' ').join('-').toLowerCase() === 'backlog') {
+                      end = moment(today)
+                  }
+
+                  items.push({
+                    id: issue.key,
+                    name: `<div class="flex" style=" align-items: center; "> <div class="circled" style="${issue.fields.assignee ? '' : 'display: none'}; background-color: ${this.displayNameColor(issue)}">${this.displayName(issue)}</div> <div> <div class="title">${issue.fields.summary}</div> <div class="key">${issue.key}</div> </div> </div>`,
+                    sectionID: project.title.split(' ').join('_'),
+                    start: moment(issue.fields.customfield_10008 || issue.fields.created).startOf('day'),
+                    fields: issue.fields,
+                    end,
+                    key: issue.key,
+                    classes: 'item-status-' + issue.fields.issuetype.name.toLowerCase() + ' ' + issue.fields.status.name.split(' ').join('-').toLowerCase(),
+                  })
+
+                })
+
+
+              }
+
+
+            })
+
+            var self = this
+
+            function daysInThisMonth() {
+              var now = new Date();
+              return new Date(now.getFullYear(), now.getMonth()+1, 0).getDate();
+            }
+
+            var sections = []
+
+            if (!this.loaded && localStorage.getItem('activeProjects')) {
+              localStorage.getItem('activeProjects').split(',').map(b => {
+                  for (var a of this.projects) {
+                    if (a.title === b) {
+                      a.id = a.title.split(' ').join('_')
+                      a.name = `<b>${a.title}</b>`
+                      // a.name = `<b>${a.title}</b> <br> ${a.lead ? a.lead.join(', ') : 'N/A'}`
+                      sections.push(a)
+                    }
+                  }
+              })
+            } else {
+              this.filtered.map(a => {
+                  a.id = a.title.split(' ').join('_')
+                  a.name = `<b>${a.title}</b>`
+                  // a.name = `<b>${a.title}</b> <br> ${a.lead ? a.lead.join(', ') : 'N/A'}`
+                  sections.push(a)
+              })
+            }
+
+            return {
+
+                Periods: [
+                    {
+                        Name: '1 week',
+                        Label: '1 week',
+                        TimeframePeriod: (60 * 24),
+                        TimeframeOverall: (60 * 24 * 7),
+                        TimeframeHeaders: [
+                            'MMM',
+                            'dddd, D'
+                        ],
+                        Classes: 'period-1week'
+                    },
+
+                    {
+                        Name: '1 month',
+                        Label: '1 month',
+                        TimeframePeriod: (60 * 24 * 1),
+                        TimeframeOverall: (60 * 24 * daysInThisMonth()),
+                        TimeframeHeaders: [
+                            'MMM',
+                            'D'
+                        ],
+                        Classes: 'period-1month'
+                    },
+
+                    {
+                        Name: '3 months',
+                        Label: '3 months',
+                        TimeframePeriod: (60 * 24 * 1),
+                        TimeframeOverall: (60 * 24 * 91), // 3 months (approximately)
+                        TimeframeHeaders: [
+                            'MMM',
+                            'D'
+                        ],
+                        Classes: 'period-3months'
+                    },
+
+                    {
+                        Name: '6 months',
+                        Label: '6 months',
+                        TimeframePeriod: (60 * 24 * 1),
+                        TimeframeOverall: (60 * 24 * 183), // 6 months (approximately)
+                        TimeframeHeaders: [
+                            'MMM',
+                            'D'
+                        ],
+                        Classes: 'period-6months'
+                    }
+                ],
+
+
+                Items: items,
+
+                Sections: sections,
+
+                Init: function () {
+
+                    TimeScheduler.Options.GetSections = self.Calendar.GetSections;
+
+                    TimeScheduler.Options.GetSchedule = self.Calendar.GetSchedule;
+                    
+                    TimeScheduler.Options.Start = moment().startOf('month');
+
+                    TimeScheduler.Options.Periods = self.Calendar.Periods;
+
+                    TimeScheduler.Options.SelectedPeriod = localStorage.getItem('SelectedPeriod') || '1 month';
+
+                    TimeScheduler.Options.Element = $('.timeline');
+
+                    TimeScheduler.Options.AllowDragging = true;
+                    TimeScheduler.Options.AllowResizing = true;
+
+                    TimeScheduler.Options.Events.ItemClicked = self.Calendar.Item_Clicked;
+                    TimeScheduler.Options.Events.ItemDropped = self.Calendar.Item_Dragged;
+                    TimeScheduler.Options.Events.ItemResized = self.Calendar.Item_Resized;
+                    TimeScheduler.Options.Events.PeriodChanged = self.Calendar.PeriodChanged;
+
+                    TimeScheduler.Options.Events.ItemMovement = self.Calendar.Item_Movement;
+                    TimeScheduler.Options.Events.ItemMovementStart = self.Calendar.Item_MovementStart;
+                    TimeScheduler.Options.Events.ItemMovementEnd = self.Calendar.Item_MovementEnd;
+
+                    TimeScheduler.Options.Text.NextButton = '&nbsp;';
+                    TimeScheduler.Options.Text.PrevButton = '&nbsp;';
+
+                    TimeScheduler.Options.MaxHeight = 100;
+
+                    TimeScheduler.Init(true);
+
+                },
+
+                GetSections: function (callback) {
+                    callback(self.Calendar.Sections);
+                },
+
+
+                GetSchedule: function (callback, start, end) {
+                    callback(self.Calendar.Items);
+                },
+
+                Item_Dragged: function (item, sectionID, start, end) {
+
+
+                    var customfield_10008 = start.startOf('day').hour(9)
+                    var duedate = end.endOf('day').hour(17)
+
+                    axios.post('/update/item/' + item.key, { 
+                      customfield_10008, 
+                      duedate,
+                      // timeestimate,
+                    }).then((res) => {
+
+                      var foundItem;
+
+                      for (var i = 0; i < self.Calendar.Items.length; i++) {
+                          foundItem = self.Calendar.Items[i];
+
+                          if (foundItem.id === item.id) {
+                              foundItem.start = start.startOf('day');
+                              foundItem.end = end.endOf('day');
+                              self.Calendar.Items[i] = foundItem;
+                          }
+                      }
+
+                      TimeScheduler.Init();
+
+                    })
+
+                },
+
+
+                Item_Resized: function (item, start, end) {
+
+                    var customfield_10008 = start.startOf('day').hour(9)
+                    var duedate = end.endOf('day').hour(17)
+
+                    axios.post('/update/item/' + item.key, { 
+                      customfield_10008, 
+                      duedate,
+                    }).then((res) => {
+
+                      var foundItem;
+
+                      for (var i = 0; i < self.Calendar.Items.length; i++) {
+                          foundItem = self.Calendar.Items[i];
+
+                          if (foundItem.id === item.id) {
+                              foundItem.start = start.startOf('day');
+                              foundItem.end = end.endOf('day');
+                              self.Calendar.Items[i] = foundItem;
+                          }
+                      }
+
+                      TimeScheduler.Init();
+
+                    })
+
+
+                },
+
+                PeriodChanged: function (period) {
+
+                    localStorage.setItem('SelectedPeriod', period)
+
+                },
+
+
+                Item_Clicked: function (task, event) {
+
+                    window.open(`${this.config.jira_url}/browse/${task.key}`, '_blank').focus();
+
+                },
+
+            }
+
+          },
+
+          filtered() {
+
+            return this.projects.filter(item => {
+
+              if (this.filterByDesigner && item.milestones) return item.milestones.find(b => {
+                return b.tasks.find(a => a.fields.assignee && a.fields.assignee.displayName.includes(this.filterByDesigner))
+              })
+
+              if (this.filterByDesigner) return item.tasks.find(a => a.fields.assignee && a.fields.assignee.displayName.includes(this.filterByDesigner))
+
+              return item.active
+
+            }).map(item => {
+
+              if (this.filterByDesigner && item.milestones) item.milestones.map(milestone => {
+                milestone.tasks = milestone.tasks.filter(a => a.fields.assignee && a.fields.assignee.displayName.includes(this.filterByDesigner))
+                return milestone
+              })
+
+              if (this.filterByDesigner) item.tasks = item.tasks.filter(a => a.fields.assignee && a.fields.assignee.displayName.includes(this.filterByDesigner))
+
+              return item
+
+            })
+
+          },
+
+        },
+
+        watch: {
+
+          showDiff() {
+
+
+            if (!this.showDiff) {
+              this.lines.forEach(line => line.remove());
+              this.$refs.scrollArea.removeEventListener('scroll', this.updateLines);
+              window.removeEventListener('resize', this.updateLines);
+              return
+            }
+
+            this.lines.forEach(line => line.remove());
+            this.lines = []
+
+            setTimeout(() => {
+
+              var matches = {
+                'CHARAUCT-412': 'RCAT-208'
+              }
+
+              this.showDiff.tasks.map(task => {
+                if (task.fields.summary.includes('Client Jira: ')) {
+                  var cannonical = task.fields.summary.split('Client Jira: ')[1].replace(')', '')
+                  if (cannonical) {
+                    var cannonical_task = this.diffProject.tasks.find(a => a.key === cannonical)
+                    if (cannonical_task) {
+                      matches[task.key] = cannonical_task.key
+                    }
+                  }
+                }
+              })
+
+              // drawLines() {
+              for (const leftKey in matches) {
+                const rightKey = matches[leftKey];
+                if (!this.$refs['left-' + leftKey]) continue;
+                if (!this.$refs['right-' + rightKey]) continue;
+                const from = this.$refs['left-' + leftKey][0];
+                const to = this.$refs['right-' + rightKey][0];
+                if (from && to) {
+                  const line = new LeaderLine(from, to, {
+                    color: '#' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0'),
+                    size: 2,
+                    path: 'fluid',
+                    startPlug: 'disc',
+                    endPlug: 'arrow1'
+                  });
+                  this.lines.push(line)
+                }
+              }
+
+              this.$refs.scrollArea.addEventListener('scroll', this.updateLines);
+
+              window.addEventListener('resize', this.updateLines);
+
+            }, 100)
+
+          },
+
+          view() {
+
+            if (this.view === 'timeline') {
+
+              setTimeout(() => {
+
+                $(document).ready(this.Calendar.Init);
+
+                if ( TimeScheduler.Options.SelectedPeriod === '1 month' ) {
+                  TimeScheduler.Options.Start = moment().startOf('month');
+                  TimeScheduler.Init();
+                }
+
+              }, 10)
+
+            } else {
+              if (document.querySelector('.time-sch-wrapper')) {
+                document.querySelector('.time-sch-wrapper').remove()
+              }
+            }
+
+            localStorage.setItem('view-mode', this.view)
+
+          }
+
+        },
+    })
+
+</script>
+  
+</body>
+</html>

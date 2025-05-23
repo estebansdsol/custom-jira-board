@@ -1,0 +1,24 @@
+{
+	"jira_url": "https://sdsoltech.atlassian.net",
+	"jira_email": "_JIRA_EMAIL_",
+	"jira_account_id": "_JIRA_USER_UUID_FOR_REMINDERS",
+	"jira_api_key": "_API_KEY_",
+	"jira_url": "https://sdsoltech.atlassian.net",
+	"screens": ["tasks", "gantt", "text", "todo"],
+	"watch": ["backlog", "in-progress"],
+	"projects": [
+		{
+			"id": "EVOLVED",
+			"title": "EVOLVED",
+			"longTitle": "Rise Evolved Game",
+			"lead": ["Shafiq"],
+			"people": [
+				{
+					"name": "Sadie Gunnink",
+					"email": "sadie@gunzel.us"
+				}
+			],
+			"epic": "EVOLVED-1"
+		}
+	]
+}
