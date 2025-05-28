@@ -474,26 +474,27 @@ app.delete('/reminders/:id', async (req, res) => {
 app.post('/tasks', async (req, res) => {
 
 
-        var createResponse = await (await jira(req.body.jira)).createIssue({
-            fields: {
-                project: { key: req.body.project },
-                summary: req.body.title,
-                description: req.body.description,
-                customfield_10008: req.body.startdate,
-                duedate: req.body.duedate,
-                issuetype: { name: "Task" },
-                assignee: config.jira_account_id ? { accountId: config.jira_account_id } : null,
-                parent: req.body.parent ? { key: req.body.parent } : null
-            }
-        })
+    var createResponse = await (await jira(req.body.jira)).createIssue({
+        fields: {
+            project: { key: req.body.project },
+            summary: req.body.title,
+            description: req.body.description,
+            customfield_10008: req.body.startdate,
+            duedate: req.body.duedate,
+            issuetype: { name: "Task" },
+            assignee: config.jira_account_id ? { accountId: config.jira_account_id } : null,
+            parent: req.body.parent ? { key: req.body.parent } : null
+        }
+    })
 
-        var transitions = await ((await jira()).getTransitions(createResponse.key)).transitions
-    
-
-        await (await jira()).updateStatus(createResponse.key, transitions.find(a => a.name === 'In Progress').id)
+    var transitions = await ((await jira()).getTransitions(createResponse.key)).transitions
 
 
-        return res.json( transitions )
+    if (transitions) await (await jira()).updateStatus(createResponse.key, transitions.find(a => a.name === 'In Progress').id)
+
+
+    return res.json( transitions )
+
 
 })
 

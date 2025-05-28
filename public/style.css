@@ -378,21 +378,18 @@ label .label-text:before {
   color: #FFF;
 }
 
+.tag.review {
+  background-color: #26a0f3;
+  color: #ffffff;
+  border: 0;
+}
+
 .tag.progress {
   background-color: #e67e22;
   color: #ffffff;
   border: 0;
 }
 
-.tag.review {
-  background-color: var(--tag-color-three);
-  color: var(--tag-color-text-three);
-}
-
-.tag.waiting {
-  background-color: var(--tag-color-four);
-  color: var(--tag-color-text-four);
-}
 
 .upcoming {
   border-bottom: 1px solid #ddd;
@@ -730,6 +727,10 @@ opacity: 0.5;
   align-items: center;
   justify-content: center;
   pointer-events: none;
+}
+
+.create-reminder .toggle > div.active {
+  color: #000;
 }
 
 .popup .box, .create-reminder .box {

@@ -53,8 +53,8 @@
 <div id="app" class="task-manager">
 
 
-  <div v-if="loading" id="loading">
-    <div>{{ loading === true ? 'Loading projects...' : 'Refreshing ' + loading }}</div>
+  <div v-if="loading === true" id="loading">
+    <div>Loading projects...</div>
   </div>
 
 
@@ -835,7 +835,7 @@
               
               parent: this.filtered[0] && this.filtered[0].epic ? this.filtered[0].epic : null,
 
-              status: 'in-progress'
+              done: false
 
             }
 
@@ -1056,6 +1056,7 @@
             if (task.fields.status.name === 'Ready for QA (Production)') return 'approved'
             if (task.fields.status.name === 'Ready for QA (Staging)') return 'approved'
             if (task.fields.status.name === 'PM Review') return 'approved'
+            if (task.fields.status.name === 'QA Review') return 'review'
 
             if (task.done) return 'approved'
             
