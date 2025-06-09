@@ -78,7 +78,7 @@
       </div>
 
       <select v-model="reminder.project">
-        <option disabled>-- Project --</option>
+        <option value="SDSOL">-- SDSOL --</option>
         <option :value="project.id || project.title" v-for="project in projects">{{ project.title }}</option>
       </select>
 
@@ -298,7 +298,7 @@
 
                 <div class="card-title">Reminders</div>
 
-                <div v-for="task in projectReminders(project)" class="task" @click="click(task)" :style="`task.done ? 'text-decoration: line-through' : ''`">
+                <div v-for="task in projectReminders(project)" class="task" @click="click({ task: task })" :style="`task.done ? 'text-decoration: line-through' : ''`">
                   <div class="flex justify">
                     <span class="label-text">{{ task.title }}</span>
                   </div>
@@ -317,7 +317,7 @@
                     <div class="progress-label" :style="`${milestone.percent > 49 ? 'color: white' : 'color: #6b6b6b'}`">{{ milestone.percent }}%</div>
                 </div>
 
-                <div v-for="task in milestone.tasks" class="task" @click="click(task)">
+                <div v-for="task in sortByStatus(milestone.tasks)" class="task" @click="click(task)">
                   <div class="flex justify">
                     <div class="members" style="margin-top:0; margin-right: 5px">
                       <div :style="`background-color: ${displayNameColor(task)}`">{{ displayName(task) }}</div>
@@ -541,6 +541,13 @@
 
         },
         methods: {
+
+          sortByStatus(tasks) {
+            return JSON.parse(JSON.stringify(tasks)).sort((a, b) => {
+              if (a.done === b.done) return 0;
+              return !a.done ? -1 : 1;
+            })
+          },
 
 
           filterTasksByDateRange(tasks, range) {
