@@ -49,7 +49,6 @@
 </head>
 <body>
 
-
 <div id="app" class="task-manager">
 
 
@@ -470,11 +469,12 @@
 
 </div>
 
-
 <script>
 
     window.jira = new Vue({
+
         el: '#app',
+
         data: {
 
             view: localStorage.getItem('view-mode') || 'schedule',
@@ -520,6 +520,7 @@
             currentTimePosition: 0,
 
         },
+
         mounted() {
 
             this.load(() => {
@@ -540,7 +541,20 @@
             setInterval(this.updateCurrentTimeLine, 60000);
 
         },
+
         methods: {
+
+          selectAll() {
+            this.projects.map(a => {
+              a.active = true
+            })
+            localStorage.setItem('activeProjects', this.projects.filter(a => a.active).map(a => a.title).join(','))
+            this.$forceUpdate()
+          },
+
+          refresh(key) {
+            this.refreshJira( this.projects.find(a => a.id === key || a.title === key) )
+          },
 
           sortByStatus(tasks) {
             return JSON.parse(JSON.stringify(tasks)).sort((a, b) => {
@@ -736,6 +750,7 @@
               } )
             })
 
+
             this.events = events
 
             this.setReminders()
@@ -760,7 +775,26 @@
                 } )
               })
 
+
+              events.push({
+                done: false,
+                task: {
+                  done: false,
+                  // duedate: "2025-06-02 15:49:33",
+                  // parent: "MASTEC-53",
+                  project: "MASTEC",
+                  // repeat: "",
+                  starttime: "2025-06-09T14:00",
+                  title: "Project Check-In: Abrar"
+                },
+                time: "11:00",
+                title: "Project Check-In: Abrar"
+              })
+
+
               events.map(a => this.events.push(a))
+
+              console.log( this.events )
 
             })
 
@@ -912,7 +946,6 @@
                 this.load(() => {
                   this.showDiff = this.projects.find(a => a.id === this.showDiff.id)
                 })
-                // this.showDiff = this.projects.find(a => a.id === this.showDiff.id)
                 axios.post('/refresh/' + this.showDiff.sync, { jira: this.diffProject.jira }).then(() => {
                   this.loading = false
                   this.load(() => {
@@ -936,8 +969,11 @@
 
           },
 
-          composeEmail( project ) {
-            axios.post('/email', { people: project.people, title: project.longTitle || project.title })
+          composeEmail( project, body ) {
+            axios.post('/email', { 
+              project: typeof project !== 'string' ? (project.title || project.id) : project,
+              body
+            })
           },
 
           viewJiraPage( project ) {
@@ -977,7 +1013,7 @@
 
           setActive(event, project) {
 
-            if (event.shiftKey || event.metaKey) {
+            if (event && (event.shiftKey || event.metaKey)) {
 
               project.active = !project.active
 
@@ -1002,16 +1038,12 @@
             localStorage.setItem('activeProjects', this.projects.filter(a => a.active).map(a => a.title).join(','))
             
             if (this.view === 'timeline') this.Calendar.Init(true)
-
-            // if (this.view === 'text') this.view = 'schedule'
             
             this.$forceUpdate()
 
           },
 
           load(cb, refresh) {
-
-            // this.loading = true
 
             axios.get('/api').then((res) => {
               
@@ -1030,8 +1062,6 @@
               }
 
               if (cb) cb()
-
-              // this.loading = false
 
             })
 
@@ -1507,7 +1537,7 @@
 
                 Item_Clicked: function (task, event) {
 
-                    window.open(`${this.config.jira_url}/browse/${task.key}`, '_blank').focus();
+                    window.open(`${self.config.jira_url}/browse/${task.key}`, '_blank').focus();
 
                 },
 
@@ -1631,6 +1661,10 @@
 
         },
     })
+  
+    // aliases for browser console
+    window.all = jira.selectAll
+    window.email = jira.composeEmail
 
 </script>
   

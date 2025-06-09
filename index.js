@@ -526,9 +526,23 @@ app.post('/update/item/:key', async (req, res) => {
 // todo: make it detect os and work for both mac and windows
 app.post('/email', async (req, res) => {
 
-    const recipients = req.body.people.map(a => `make new recipient at newMessage with properties {email address:{address:"${a.email}"}}`).join('\n        ');
-    const subject = `${req.body.title} - `; // Define subject if needed
-    const body = ''; // Define body if needed
+    var projects = JSON.parse(fs.readFileSync('./config.json', 'utf8')).projects
+
+    let subject
+    let recipients = req.body.people
+    
+    if (!recipients && req.body.project) {
+        var project = projects.find(a => a.title === req.body.project || a.id === req.body.project)
+        if (project && project.people) {
+            subject = `${project.longTitle || project.title } - `; // Define subject if needed
+            recipients = project.people.map(a => `make new recipient at newMessage with properties {email address:{address:"${a.email}"}}`).join('\n        ');
+        } else {
+            return res.json({ error: "Project has no people configured." })
+        }
+    }
+    
+    
+    const body = req.body.body || ''; // Define body if needed
 
     // Your updated AppleScript command
     const appleScript = `
