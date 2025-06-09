@@ -757,7 +757,7 @@
 
           },
 
-          recommendedReminders() {
+          recommendedReminders(existing) {
 
             var events = []
 
@@ -767,42 +767,55 @@
             const isMonday = today.getDay() === 1;
             const isFriday = today.getDay() === 5;
 
-            // leads
-            var leads = []
-
-            this.projects.map(a => {
-              if (a.lead) a.lead.map(b => {
-                if (!leads.includes(b)) leads.push(b)
-              })
-            })
-
-            console.log(leads)
-
-            leads.map(lead => {
-              var projects = this.projects.filter(b => b.lead && b.lead.includes(lead))
-              console.log(lead, projects)
-            })
-
-
+            // client check-ins
             // if (isMonday) {
-
-            //   events.push({
-            //     done: false,
-            //     recommended: true,
-            //     task: {
-            //       done: false,
-            //       // parent: "MASTEC-53",
-            //       project: "MASTEC",
-            //       starttime: "2025-06-09T14:00",
-            //       title: "Project Check-In: Abrar"
-            //     },
-            //     time: "11:00",
-            //     title: "Project Check-In: Abrar"
-            //   })
-
+            //   var activeProjects = this.projects.filter(a => a.tasks.find(b => !b.done))
+            //   console.log( activeProjects )
             // }
 
-            return events
+            // lahore check-ins
+            if (!isMonday) {
+
+              // leads
+              var leads = []
+
+              this.projects.map(a => {
+                if (a.lead) a.lead.map(b => {
+                  if (!leads.includes(b)) leads.push(b)
+                })
+              })
+
+              var times = {
+                'Muaaz': '10:00',
+                'Abrar': '11:00',
+                'Shafiq': '12:00',
+              }
+
+              leads.map(lead => {
+
+                var projects = this.projects.filter(b => b.lead && b.lead.includes(lead))
+
+                events.push({
+                  done: false,
+                  recommended: true,
+                  task: {
+                    done: false,
+                    // parent: "MASTEC-53",
+                    project: "SDSOL",
+                    starttime: `${new Date().toISOString().split('T')[0]}T${times[lead]}`,
+                    title: `Project Check-In: ${lead}`
+                  },
+                  time: times[lead],
+                  title: `Project Check-In: ${lead}`
+                })
+
+              })
+
+            }
+
+
+            this.events = [...this.events, ...events]
+
 
           },
 
@@ -824,11 +837,10 @@
                 } )
               })
 
-
-              this.recommendedReminders().map(a => events.push(a))
-
-
               events.map(a => this.events.push(a))
+
+              this.recommendedReminders()
+
 
             })
 
@@ -1183,6 +1195,8 @@
             this.filterByDesigner = ''
 
             if (this.view === 'timeline') this.Calendar.Init(true)
+
+            localStorage.setItem('activeProjects', this.projects.filter(a => a.active).map(a => a.title).join(','))
 
           },
 
