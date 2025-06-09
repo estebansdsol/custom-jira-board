@@ -453,7 +453,7 @@
             <div
               v-for="(event, index) in getEventsForHour(hour)"
               :key="event.id"
-              :class="`event ${event.key ? '' : 'reminder'}`"
+              :class="`event ${event.key ? '' : 'reminder'} ${event.recommended ? 'recommended' : ''}`"
               :style="`${event.done ? 'background: #22ab5c;text-decoration: line-through;': ''}`"
               @click.stop="click(event)">
               {{ event.title }}
@@ -757,6 +757,55 @@
 
           },
 
+          recommendedReminders() {
+
+            var events = []
+
+            const today = new Date();
+
+            // 0 = Sunday, 5 = Friday
+            const isMonday = today.getDay() === 1;
+            const isFriday = today.getDay() === 5;
+
+            // leads
+            var leads = []
+
+            this.projects.map(a => {
+              if (a.lead) a.lead.map(b => {
+                if (!leads.includes(b)) leads.push(b)
+              })
+            })
+
+            console.log(leads)
+
+            leads.map(lead => {
+              var projects = this.projects.filter(b => b.lead && b.lead.includes(lead))
+              console.log(lead, projects)
+            })
+
+
+            // if (isMonday) {
+
+            //   events.push({
+            //     done: false,
+            //     recommended: true,
+            //     task: {
+            //       done: false,
+            //       // parent: "MASTEC-53",
+            //       project: "MASTEC",
+            //       starttime: "2025-06-09T14:00",
+            //       title: "Project Check-In: Abrar"
+            //     },
+            //     time: "11:00",
+            //     title: "Project Check-In: Abrar"
+            //   })
+
+            // }
+
+            return events
+
+          },
+
           setReminders() {
 
             axios.get('/reminders').then((res) => {
@@ -776,25 +825,10 @@
               })
 
 
-              events.push({
-                done: false,
-                task: {
-                  done: false,
-                  // duedate: "2025-06-02 15:49:33",
-                  // parent: "MASTEC-53",
-                  project: "MASTEC",
-                  // repeat: "",
-                  starttime: "2025-06-09T14:00",
-                  title: "Project Check-In: Abrar"
-                },
-                time: "11:00",
-                title: "Project Check-In: Abrar"
-              })
+              this.recommendedReminders().map(a => events.push(a))
 
 
               events.map(a => this.events.push(a))
-
-              console.log( this.events )
 
             })
 
