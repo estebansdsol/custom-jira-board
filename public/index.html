@@ -545,7 +545,7 @@
         methods: {
 
           selectAll() {
-            this.projects.map(a => {
+            this.projects.filter(a => !a.done).map(a => {
               a.active = true
             })
             localStorage.setItem('activeProjects', this.projects.filter(a => a.active).map(a => a.title).join(','))
@@ -758,6 +758,8 @@
           },
 
           recommendedReminders(existing) {
+
+            return
 
             var events = []
 
@@ -1713,6 +1715,7 @@
     // aliases for browser console
     window.all = jira.selectAll
     window.email = jira.composeEmail
+    window.refresh = jira.refresh
 
 </script>
   
