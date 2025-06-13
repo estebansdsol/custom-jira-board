@@ -553,7 +553,9 @@
           },
 
           refresh(key) {
-            this.refreshJira( this.projects.find(a => a.id === key || a.title === key) )
+            var project = this.projects.find(a => a.id === key || a.title === key)
+            if (!project) return "No project found."
+            this.refreshJira( project )
           },
 
           sortByStatus(tasks) {
@@ -565,7 +567,9 @@
 
 
           filterTasksByDateRange(tasks, range) {
+
             const today = moment().startOf('day');
+
             let start, end;
 
             switch (range) {
@@ -597,6 +601,7 @@
               const due = task.fields?.duedate && moment(task.fields.duedate);
               return due && due.isSameOrAfter(start) && due.isSameOrBefore(end);
             });
+
           },
 
           async copyToClipboard(text) {
@@ -610,6 +615,7 @@
 
 
           generateClipboardRaw(project) {
+
             const limit = 60;
             const groups = {};
             const dayDates = {};
@@ -620,7 +626,9 @@
             groups[noDueDate] = [];
 
             project.tasks
+
               .filter(task => task.fields.duedate || task.pending || task.done)
+              
               .forEach(task => {
                 const title = task.fields.summary.split('(')[0];
                 const trimmed = title.length >= limit ? title.slice(0, limit) + '...' : title;
